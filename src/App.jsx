@@ -21,6 +21,7 @@ function App() {
   const [userForm, setUserForm] = useState({ role: 'staff', username: '', password: '', email: '' });
   const [users, setUsers] = useState([]);
   const [loginMode, setLoginMode] = useState(null);
+  const [showLoginPanel, setShowLoginPanel] = useState(false);
   const [staffLogin, setStaffLogin] = useState({ username: '', password: '' });
   const [adminLogin, setAdminLogin] = useState({ username: '', password: '' });
   const [authToken, setAuthToken] = useState('');
@@ -162,11 +163,19 @@ function App() {
 
   const goToStaff = () => {
     setLoginMode('staff');
+    setShowLoginPanel(true);
     setMessage({ type: '', text: '' });
   };
 
   const goToAdmin = () => {
     setLoginMode('admin');
+    setShowLoginPanel(true);
+    setMessage({ type: '', text: '' });
+  };
+
+  const openLoginPanel = () => {
+    setShowLoginPanel(true);
+    setLoginMode(null);
     setMessage({ type: '', text: '' });
   };
 
@@ -437,66 +446,81 @@ function App() {
         {appMode === 'landing' && (
           <section className="view-grid home-hero">
             <div className="card hero-card wide">
-              <div className="hero-copy">
-                <p className="eyebrow">Join the Ikafehaven community</p>
-                <h2>Earn loyalty rewards, scan your QR, and get gifted.</h2>
-                <p>Join the large community of Ikafehaven and collect rewards with every visit. Existing members use their ID to access their dashboard, while staff and admin log in securely from the home page.</p>
-                <div className="hero-actions">
-                  <button className="cta-primary" onClick={() => setAppMode('customer')}>Customer portal</button>
-                  <button className="cta-secondary" onClick={goToStaff}>Staff login</button>
-                  <button className="cta-secondary" onClick={goToAdmin}>Admin login</button>
+              <div className="hero-topbar">
+                <div className="hero-topbar-left">
+                  <p className="eyebrow">Ikafé Loyalty</p>
+                </div>
+                <div className="hero-topbar-right">
+                  <button className="cta-secondary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Join now</button>
+                  <button className="hero-login-link ghost-button" onClick={openLoginPanel}>Team login</button>
                 </div>
               </div>
+
+              <div className="hero-card-top">
+                <div className="hero-copy">
+                  <p className="eyebrow">Join the Ikafehaven community</p>
+                  <h2>Earn loyalty rewards, scan your QR, and get gifted.</h2>
+                  <p>Join the large community of Ikafehaven and collect rewards with every visit. Members earn points, redeem rewards, and stay connected with every order.</p>
+                  <div className="hero-actions">
+                    <button className="cta-primary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Create loyalty account</button>
+                    <button className="cta-secondary" onClick={openLoginPanel}>Staff / admin login</button>
+                  </div>
+                </div>
+
+                <div className="hero-login-box">
+                  <div className="hero-login-header">
+                    <p className="eyebrow">Team login</p>
+                    <p className="small">Staff and admin secure access</p>
+                  </div>
+                  <div className="hero-login-buttons">
+                    <button className="role-button" onClick={goToStaff}>Staff login</button>
+                    <button className="role-button ghost-button" onClick={goToAdmin}>Admin login</button>
+                  </div>
+                  {loginMode === 'staff' ? (
+                    <form onSubmit={handleStaffLogin} className="stack login-form">
+                      <input placeholder="Staff username" value={staffLogin.username} onChange={(e) => setStaffLogin({ ...staffLogin, username: e.target.value })} required />
+                      <input type="password" placeholder="Password" value={staffLogin.password} onChange={(e) => setStaffLogin({ ...staffLogin, password: e.target.value })} required />
+                      <button type="submit">Continue to staff</button>
+                    </form>
+                  ) : null}
+                  {loginMode === 'admin' ? (
+                    <form onSubmit={handleAdminLogin} className="stack login-form">
+                      <input placeholder="Admin username" value={adminLogin.username} onChange={(e) => setAdminLogin({ ...adminLogin, username: e.target.value })} required />
+                      <input type="password" placeholder="Password" value={adminLogin.password} onChange={(e) => setAdminLogin({ ...adminLogin, password: e.target.value })} required />
+                      <button type="submit">Continue to admin</button>
+                    </form>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="hero-cta-grid">
+                <div className="card hero-signup-card">
+                  <p className="panel-title">Top up your membership</p>
+                  <p className="small">Fill this quick form to join Ikafehaven and start earning points right away.</p>
+                  <form onSubmit={handleJoin} className="stack">
+                    <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
+                    <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
+                    <input placeholder="Email" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
+                    <button type="submit">Join Ikafehaven</button>
+                  </form>
+                </div>
+
+                <div className="card hero-lookup-card">
+                  <h3>Existing customer?</h3>
+                  <p>Enter your Customer ID to access your loyalty dashboard and track points.</p>
+                  <form onSubmit={handleLookup} className="stack">
+                    <input placeholder="Your Customer ID" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
+                    <button type="submit">Visit customer dashboard</button>
+                  </form>
+                </div>
+              </div>
+
               <div className="hero-visual">
                 <div className="hero-panel">
                   <p className="panel-title">Welcome to Ikafé Loyalty</p>
                   <p>Scan the code, collect points, and take gifts when you hit your next milestone.</p>
                 </div>
               </div>
-            </div>
-
-            <div className="card dashboard-card">
-              <h3>Customer portal</h3>
-              <p>Existing members can open their dashboard using their Customer ID. New members can join the program and start earning right away.</p>
-              <form onSubmit={handleLookup} className="stack">
-                <input placeholder="Your Customer ID" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
-                <button type="submit">Visit customer dashboard</button>
-              </form>
-              <div className="divider">or</div>
-              <h4>New member? Join now</h4>
-              <form onSubmit={handleJoin} className="stack">
-                <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
-                <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
-                <input placeholder="Email" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
-                <button type="submit">Join Ikafehaven</button>
-              </form>
-            </div>
-
-            <div className="card login-card">
-              <h3>Staff and admin login</h3>
-              <p>Choose your role and sign in to access the correct dashboard.</p>
-              <button type="button" className="role-button" onClick={goToStaff}>Staff login</button>
-              <button type="button" className="role-button ghost-button" onClick={goToAdmin}>Admin login</button>
-              {loginMode === 'staff' ? (
-                <form onSubmit={handleStaffLogin} className="stack login-form">
-                  <input placeholder="Staff username" value={staffLogin.username} onChange={(e) => setStaffLogin({ ...staffLogin, username: e.target.value })} required />
-                  <input type="password" placeholder="Password" value={staffLogin.password} onChange={(e) => setStaffLogin({ ...staffLogin, password: e.target.value })} required />
-                  <button type="submit">Continue to staff</button>
-                </form>
-              ) : null}
-              {loginMode === 'admin' ? (
-                <form onSubmit={handleAdminLogin} className="stack login-form">
-                  <input placeholder="Admin username" value={adminLogin.username} onChange={(e) => setAdminLogin({ ...adminLogin, username: e.target.value })} required />
-                  <input type="password" placeholder="Password" value={adminLogin.password} onChange={(e) => setAdminLogin({ ...adminLogin, password: e.target.value })} required />
-                  <button type="submit">Continue to admin</button>
-                </form>
-              ) : null}
-              {authUser ? (
-                <div className="stack auth-summary">
-                  <p>Signed in as <strong>{authUser.username}</strong></p>
-                  <p>Role: <strong>{authUser.role}</strong></p>
-                </div>
-              ) : null}
             </div>
           </section>
         )}
