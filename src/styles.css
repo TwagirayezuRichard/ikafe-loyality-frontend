@@ -129,6 +129,48 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(255,
 .loyalty-metrics strong { font-size: 1.1rem; }
 .qr { width: 180px; height: 180px; margin-top: 10px; background: white; padding: 8px; border-radius: 12px; }
 .small { color: #9fb0c7; font-size: 0.95rem; }
+
+/* Dante AI chatbot responsive behavior */
+body > div[id*="dante"],
+body > iframe[src*="dante-ai"],
+body iframe[src*="dante-ai"],
+body iframe[src*="dante"] {
+  position: fixed !important;
+  right: 16px !important;
+  bottom: 16px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 9999 !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 24px) !important;
+  width: min(420px, calc(100vw - 24px)) !important;
+  height: min(680px, calc(100vh - 24px)) !important;
+}
+
+@media (max-width: 900px) {
+  body > div[id*="dante"],
+  body > iframe[src*="dante-ai"],
+  body iframe[src*="dante-ai"],
+  body iframe[src*="dante"] {
+    right: 12px !important;
+    bottom: 12px !important;
+    width: calc(100vw - 20px) !important;
+    height: min(72vh, 560px) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  body > div[id*="dante"],
+  body > iframe[src*="dante-ai"],
+  body iframe[src*="dante-ai"],
+  body iframe[src*="dante"] {
+    right: 10px !important;
+    left: 10px !important;
+    bottom: 10px !important;
+    width: calc(100vw - 20px) !important;
+    height: min(78vh, 500px) !important;
+  }
+}
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
   .view-grid { grid-template-columns: 1fr; }
