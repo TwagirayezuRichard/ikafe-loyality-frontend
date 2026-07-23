@@ -27,6 +27,8 @@ function App() {
   const [joinForm, setJoinForm] = useState({ name: '', phone: '', email: '' });
   const [purchaseForm, setPurchaseForm] = useState({ customerId: '', amount: '' });
   const [userForm, setUserForm] = useState({ role: 'staff', username: '', password: '', email: '' });
+  const [editUserForm, setEditUserForm] = useState({ id: '', role: '', username: '', password: '', email: '' });
+  const [editingUser, setEditingUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [loginMode, setLoginMode] = useState(null);
   const [showLoginPanel, setShowLoginPanel] = useState(false);
@@ -340,6 +342,73 @@ function App() {
     }
   };
 
+  const handleEditUser = (user) => {
+    setEditUserForm({
+      id: user._id,
+      role: user.role,
+      username: user.username,
+      password: '',
+      email: user.email || ''
+    });
+    setEditingUser(user);
+  };
+
+  const handleUpdateUser = async (event) => {
+    event.preventDefault();
+    if (!authToken) {
+      return showMessage('error', 'Admin login required to update users');
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/users/${editUserForm.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          role: editUserForm.role,
+          username: editUserForm.username,
+          password: editUserForm.password || undefined,
+          email: editUserForm.email
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'User could not be updated');
+      setEditUserForm({ id: '', role: '', username: '', password: '', email: '' });
+      setEditingUser(null);
+      showMessage('success', `${data.username || 'User'} updated successfully`);
+      loadUsers();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!authToken) {
+      return showMessage('error', 'Admin login required to delete users');
+    }
+
+    if (!confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'User could not be deleted');
+      showMessage('success', 'User deleted successfully');
+      loadUsers();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
   return (
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -381,46 +450,46 @@ function App() {
             <div className="card hero-card wide">
               <div className="hero-topbar">
                 <div className="hero-topbar-left">
-                  <p className="eyebrow">Ikafé Loyalty</p>
+                  <p className="eyebrow">☕ Ikafé Loyalty Program</p>
                 </div>
                 <div className="hero-topbar-right">
-                  <button className="cta-secondary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Join now</button>
-                  <button className="hero-login-link ghost-button" onClick={openLoginPanel}>Team login</button>
+                  <button className="cta-secondary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Get Started</button>
+                  <button className="hero-login-link ghost-button" onClick={openLoginPanel}>Team Access</button>
                 </div>
               </div>
 
               <div className="hero-card-top">
                 <div className="hero-copy">
-                  <p className="eyebrow">Join the Ikafé community</p>
-                  <h2>Earn cashback, climb 5 loyalty levels, and redeem wallet balance on future orders.</h2>
-                  <p>Customers earn cashback in RWF on every bill and automatically move up through the levels as their visits increase.</p>
+                  <p className="eyebrow">Rewards That Grow With You</p>
+                  <h2>Earn Cashback on Every Visit • Unlock Exclusive Perks • Redeem Your Wallet</h2>
+                  <p>Join our loyalty program and earn up to 5% cashback on every purchase. Watch your rewards grow as you climb through 5 exclusive levels, from your first visit to VIP status.</p>
                   <div className="hero-actions">
-                    <button className="cta-primary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Create loyalty account</button>
-                    <button className="cta-secondary" onClick={openLoginPanel}>Staff / admin login</button>
+                    <button className="cta-primary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Start Earning Today</button>
+                    <button className="cta-secondary" onClick={openLoginPanel}>Staff Dashboard</button>
                   </div>
                 </div>
 
                 <div className="hero-login-box">
                   <div className="hero-login-header">
-                    <p className="eyebrow">Team login</p>
-                    <p className="small">Staff and admin secure access</p>
+                    <p className="eyebrow">🔐 Team Portal</p>
+                    <p className="small">Secure access for staff and administrators</p>
                   </div>
                   <div className="hero-login-buttons">
-                    <button className="role-button" onClick={goToStaff}>Staff login</button>
-                    <button className="role-button ghost-button" onClick={goToAdmin}>Admin login</button>
+                    <button className="role-button" onClick={goToStaff}>Staff Login</button>
+                    <button className="role-button ghost-button" onClick={goToAdmin}>Admin Login</button>
                   </div>
                   {loginMode === 'staff' ? (
                     <form onSubmit={handleStaffLogin} className="stack login-form">
                       <input placeholder="Staff username" value={staffLogin.username} onChange={(e) => setStaffLogin({ ...staffLogin, username: e.target.value })} required />
                       <input type="password" placeholder="Password" value={staffLogin.password} onChange={(e) => setStaffLogin({ ...staffLogin, password: e.target.value })} required />
-                      <button type="submit">Continue to staff</button>
+                      <button type="submit">Access Staff Dashboard</button>
                     </form>
                   ) : null}
                   {loginMode === 'admin' ? (
                     <form onSubmit={handleAdminLogin} className="stack login-form">
                       <input placeholder="Admin username" value={adminLogin.username} onChange={(e) => setAdminLogin({ ...adminLogin, username: e.target.value })} required />
                       <input type="password" placeholder="Password" value={adminLogin.password} onChange={(e) => setAdminLogin({ ...adminLogin, password: e.target.value })} required />
-                      <button type="submit">Continue to admin</button>
+                      <button type="submit">Access Admin Dashboard</button>
                     </form>
                   ) : null}
                 </div>
@@ -428,30 +497,51 @@ function App() {
 
               <div className="hero-cta-grid">
                 <div className="card hero-signup-card">
-                  <p className="panel-title">Join the loyalty club</p>
-                  <p className="small">Create your account and start building a cashback wallet in RWF.</p>
+                  <p className="panel-title">🎁 Join the Loyalty Club</p>
+                  <p className="small">Create your account in seconds and start earning cashback on every visit. Your wallet grows with each purchase.</p>
                   <form id="join-form" onSubmit={handleJoin} className="stack">
                     <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
                     <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
-                    <input placeholder="Email" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
-                    <button type="submit">Join Ikaféhaven</button>
+                    <input placeholder="Email (optional)" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
+                    <button type="submit">Create My Account</button>
                   </form>
                 </div>
 
                 <div className="card hero-lookup-card">
-                  <h3>Existing customer?</h3>
-                  <p>Enter your customer ID to open your loyalty dashboard and review your wallet.</p>
+                  <h3>👤 Already a Member?</h3>
+                  <p>Enter your customer ID to access your loyalty dashboard, check your wallet balance, and view your rewards progress.</p>
                   <form onSubmit={handleLookup} className="stack">
-                    <input placeholder="Your Customer ID" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
-                    <button type="submit">Visit customer dashboard</button>
+                    <input placeholder="Customer ID (e.g., IKH-000001)" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
+                    <button type="submit">Open My Dashboard</button>
                   </form>
                 </div>
               </div>
 
               <div className="hero-visual">
                 <div className="hero-panel">
-                  <p className="panel-title">Cashback rules</p>
-                  <p>Level 1: 1% • Level 2: 2% • Level 3: 3% • Level 4: 4% • Level 5: 5%.</p>
+                  <p className="panel-title">📈 Your Rewards Journey</p>
+                  <div className="level-progress">
+                    <div className="level-step">
+                      <span className="level-badge">Level 1</span>
+                      <span className="level-detail">1-5 visits • 1% cashback</span>
+                    </div>
+                    <div className="level-step">
+                      <span className="level-badge">Level 2</span>
+                      <span className="level-detail">6-15 visits • 2% cashback</span>
+                    </div>
+                    <div className="level-step">
+                      <span className="level-badge">Level 3</span>
+                      <span className="level-detail">16-25 visits • 3% cashback</span>
+                    </div>
+                    <div className="level-step">
+                      <span className="level-badge">Level 4</span>
+                      <span className="level-detail">26-35 visits • 4% cashback</span>
+                    </div>
+                    <div className="level-step">
+                      <span className="level-badge level-vip">Level 5</span>
+                      <span className="level-detail">36+ visits • 5% cashback</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -636,7 +726,22 @@ function App() {
 
             <div className="card">
               <h3>Staff & admin users</h3>
-              {users.length ? (
+              {editingUser ? (
+                <form onSubmit={handleUpdateUser} className="stack">
+                  <h4>Edit user: {editingUser.username}</h4>
+                  <select value={editUserForm.role} onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}>
+                    <option value="staff">Staff</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <input placeholder="Username" value={editUserForm.username} onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })} required />
+                  <input type="password" placeholder="New password (leave blank to keep current)" value={editUserForm.password} onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })} />
+                  <input type="email" placeholder="Email" value={editUserForm.email} onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })} />
+                  <div className="inline-form">
+                    <button type="submit">Update user</button>
+                    <button type="button" onClick={() => { setEditingUser(null); setEditUserForm({ id: '', role: '', username: '', password: '', email: '' }); }}>Cancel</button>
+                  </div>
+                </form>
+              ) : users.length ? (
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -644,6 +749,7 @@ function App() {
                         <th>Role</th>
                         <th>Username</th>
                         <th>Email</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -652,6 +758,12 @@ function App() {
                           <td>{user.role}</td>
                           <td>{user.username}</td>
                           <td>{user.email || '—'}</td>
+                          <td>
+                            <div className="inline-form">
+                              <button onClick={() => handleEditUser(user)}>Edit</button>
+                              <button onClick={() => handleDeleteUser(user._id)}>Delete</button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
