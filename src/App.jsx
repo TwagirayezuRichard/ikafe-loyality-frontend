@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://ikafe-loyality-backend.onrender.com/api';
 
@@ -37,6 +37,7 @@ function App() {
   const [authToken, setAuthToken] = useState('');
   const [authUser, setAuthUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const joinFormRef = useRef(null);
 
   const loadCustomers = async () => {
     try {
@@ -453,7 +454,16 @@ function App() {
                   <p className="eyebrow">☕ Ikafé Loyalty Program</p>
                 </div>
                 <div className="hero-topbar-right">
-                  <button className="cta-secondary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Get Started</button>
+                  <button className="cta-secondary" onClick={() => {
+                    const form = joinFormRef.current || document.getElementById('join-form');
+                    if (form) {
+                      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      setTimeout(() => {
+                        const firstInput = form.querySelector('input');
+                        if (firstInput) firstInput.focus();
+                      }, 800);
+                    }
+                  }}>Get Started</button>
                   <button className="hero-login-link ghost-button" onClick={openLoginPanel}>Team Access</button>
                 </div>
               </div>
@@ -464,7 +474,16 @@ function App() {
                   <h2>Earn Cashback on Every Visit • Unlock Exclusive Perks • Redeem Your Wallet</h2>
                   <p>Join our loyalty program and earn up to 5% cashback on every purchase. Watch your rewards grow as you climb through 5 exclusive levels, from your first visit to VIP status.</p>
                   <div className="hero-actions">
-                    <button className="cta-primary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Start Earning Today</button>
+                    <button className="cta-primary" onClick={() => {
+                      const form = joinFormRef.current || document.getElementById('join-form');
+                      if (form) {
+                        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        setTimeout(() => {
+                          const firstInput = form.querySelector('input');
+                          if (firstInput) firstInput.focus();
+                        }, 800);
+                      }
+                    }}>Start Earning Today</button>
                     <button className="cta-secondary" onClick={openLoginPanel}>Staff Dashboard</button>
                   </div>
                 </div>
@@ -499,7 +518,7 @@ function App() {
                 <div className="card hero-signup-card">
                   <p className="panel-title">🎁 Join the Loyalty Club</p>
                   <p className="small">Create your account in seconds and start earning cashback on every visit. Your wallet grows with each purchase.</p>
-                  <form id="join-form" onSubmit={handleJoin} className="stack">
+                  <form id="join-form" ref={joinFormRef} onSubmit={handleJoin} className="stack">
                     <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
                     <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
                     <input placeholder="Email (optional)" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
