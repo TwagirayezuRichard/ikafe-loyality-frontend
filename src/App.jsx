@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 
-// Default API base points to your Render backend; can be overridden with VITE_API_BASE
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://ikafe-loyality-backend.onrender.com/api';
+
+const LEVEL_DETAILS = {
+  1: { label: 'Level 1', cashbackRate: 1, range: 'Visits 1-5' },
+  2: { label: 'Level 2', cashbackRate: 2, range: 'Visits 6-15' },
+  3: { label: 'Level 3', cashbackRate: 3, range: 'Visits 16-25' },
+  4: { label: 'Level 4', cashbackRate: 4, range: 'Visits 26-35' },
+  5: { label: 'Level 5', cashbackRate: 5, range: 'Visits 36+' }
+};
+
+function formatRwf(value) {
+  return `${Number(value || 0).toLocaleString('en-US')} RWF`;
+}
 
 function App() {
   const [appMode, setAppMode] = useState('landing');
   const [customers, setCustomers] = useState([]);
-  const [rewards, setRewards] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [qrCode, setQrCode] = useState('');
@@ -15,9 +25,7 @@ function App() {
   const [staffLookupInput, setStaffLookupInput] = useState('');
 
   const [joinForm, setJoinForm] = useState({ name: '', phone: '', email: '' });
-  const [pointsForm, setPointsForm] = useState({ customerId: '', amount: '' });
-  const [redeemForm, setRedeemForm] = useState({ customerId: '', pointsRequired: '' });
-  const [rewardForm, setRewardForm] = useState({ name: '', description: '', pointsRequired: '' });
+  const [purchaseForm, setPurchaseForm] = useState({ customerId: '', amount: '' });
   const [userForm, setUserForm] = useState({ role: 'staff', username: '', password: '', email: '' });
   const [users, setUsers] = useState([]);
   const [loginMode, setLoginMode] = useState(null);
@@ -38,16 +46,6 @@ function App() {
     } catch (error) {
       console.error(error);
       setCustomers([]);
-    }
-  };
-
-  const loadRewards = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/rewards`);
-      const data = await res.json();
-      setRewards(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
     }
   };
 
@@ -89,7 +87,6 @@ function App() {
   };
 
   useEffect(() => {
-    loadRewards();
     if (authToken) {
       loadCustomers();
       loadUsers();
@@ -97,7 +94,7 @@ function App() {
   }, [authToken]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("ikafeAuth");
+    const saved = localStorage.getItem('ikafeAuth');
     if (saved) {
       try {
         const { token, user } = JSON.parse(saved);
@@ -106,21 +103,21 @@ function App() {
           setAuthUser(user);
         }
       } catch (error) {
-        console.error("Failed to restore auth", error);
+        console.error('Failed to restore auth', error);
       }
     }
   }, []);
 
   const stats = useMemo(() => {
-    const totalPoints = customers.reduce((sum, item) => sum + Number(item.points || 0), 0);
+    const totalWalletBalance = customers.reduce((sum, item) => sum + Number(item.walletBalance || 0), 0);
     const totalSpent = customers.reduce((sum, item) => sum + Number(item.totalSpent || 0), 0);
     const totalVisits = customers.reduce((sum, item) => sum + Number(item.visits || 0), 0);
-    return { totalPoints, totalSpent, totalVisits };
+    return { totalWalletBalance, totalSpent, totalVisits };
   }, [customers]);
 
   const topCustomers = useMemo(() => {
     return [...customers]
-      .sort((a, b) => Number(b.points || 0) - Number(a.points || 0))
+      .sort((a, b) => Number(b.walletBalance || 0) - Number(a.walletBalance || 0))
       .slice(0, 5);
   }, [customers]);
 
@@ -129,21 +126,9 @@ function App() {
   const syncCustomerState = async (customerData, generatedQrCode = '') => {
     setCustomer(customerData);
     setQrCode(generatedQrCode);
-    setPointsForm((prev) => ({ ...prev, customerId: customerData.customerId }));
-    setRedeemForm((prev) => ({ ...prev, customerId: customerData.customerId }));
+    setPurchaseForm((prev) => ({ ...prev, customerId: customerData.customerId }));
     await loadTransactions(customerData.customerId);
   };
-
-  const customerRewardMessage = useMemo(() => {
-    if (!customer || !rewards.length) return '';
-    const eligibleReward = [...rewards]
-      .filter((reward) => customer.points >= reward.pointsRequired)
-      .sort((a, b) => b.pointsRequired - a.pointsRequired)[0];
-
-    return eligibleReward
-      ? `Congratulations ${customer.name}! You now have ${customer.points} points and can take the reward: ${eligibleReward.name}. Please claim it now.`
-      : '';
-  }, [customer, rewards]);
 
   const handleReturnHome = () => {
     setAppMode('landing');
@@ -152,8 +137,7 @@ function App() {
     setTransactions([]);
     setCustomerIdInput('');
     setStaffLookupInput('');
-    setPointsForm({ customerId: '', amount: '' });
-    setRedeemForm({ customerId: '', pointsRequired: '' });
+    setPurchaseForm({ customerId: '', amount: '' });
     setJoinForm({ name: '', phone: '', email: '' });
     setAuthToken('');
     setAuthUser(null);
@@ -280,98 +264,47 @@ function App() {
       const data = await res.json();
       if (!res.ok || !data) throw new Error('Customer not found');
       await syncCustomerState(data);
-      setPointsForm((prev) => ({ ...prev, customerId: data.customerId }));
-      setRedeemForm((prev) => ({ ...prev, customerId: data.customerId }));
-      showMessage('success', `Customer loaded for checkout`);
+      setPurchaseForm((prev) => ({ ...prev, customerId: data.customerId }));
+      showMessage('success', 'Customer loaded for checkout');
     } catch (error) {
       showMessage('error', error.message);
     }
   };
 
-  const handleAddPoints = async (event) => {
+  const handlePurchase = async (event) => {
     event.preventDefault();
     if (!authToken) {
       return showMessage('error', 'Staff or admin login required');
     }
 
     try {
-      const res = await fetch(`${API_BASE}/loyalty/add-points`, {
+      const res = await fetch(`${API_BASE}/loyalty/process-purchase`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`
         },
-        body: JSON.stringify({ customerId: pointsForm.customerId, amount: Number(pointsForm.amount) })
+        body: JSON.stringify({ customerId: purchaseForm.customerId, amount: Number(purchaseForm.amount) })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Unable to add points');
-      setPointsForm((prev) => ({ ...prev, amount: '' }));
-      showMessage('success', data.message || 'Points added');
+      
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Response is not JSON:', text);
+        throw new Error('Server returned invalid response. Please try again.');
+      }
+      
+      if (!res.ok) throw new Error(data.message || 'Unable to process purchase');
+      setPurchaseForm((prev) => ({ ...prev, amount: '' }));
+      showMessage('success', `Purchase processed. Cashback earned: ${formatRwf(data.cashbackEarned)}.`);
       loadCustomers();
-      if (pointsForm.customerId) {
-        const customerRes = await fetch(`${API_BASE}/customers/${pointsForm.customerId}`);
+      if (purchaseForm.customerId) {
+        const customerRes = await fetch(`${API_BASE}/customers/${purchaseForm.customerId}`);
         const customerData = await customerRes.json();
         await syncCustomerState(customerData);
       }
-    } catch (error) {
-      showMessage('error', error.message);
-    }
-  };
-
-  const handleRedeem = async (event) => {
-    event.preventDefault();
-    if (!authToken) {
-      return showMessage('error', 'Staff or admin login required');
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/loyalty/redeem`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ customerId: redeemForm.customerId, pointsRequired: Number(redeemForm.pointsRequired) })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Unable to redeem');
-      setRedeemForm((prev) => ({ ...prev, pointsRequired: '' }));
-      showMessage('success', data.message || 'Reward redeemed');
-      loadCustomers();
-      if (redeemForm.customerId) {
-        const customerRes = await fetch(`${API_BASE}/customers/${redeemForm.customerId}`);
-        const customerData = await customerRes.json();
-        await syncCustomerState(customerData);
-      }
-    } catch (error) {
-      showMessage('error', error.message);
-    }
-  };
-
-  const handleCreateReward = async (event) => {
-    event.preventDefault();
-    if (!authToken) {
-      return showMessage('error', 'Admin login required');
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/rewards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          name: rewardForm.name,
-          description: rewardForm.description,
-          pointsRequired: Number(rewardForm.pointsRequired)
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Reward could not be created');
-      setRewardForm({ name: '', description: '', pointsRequired: '' });
-      showMessage('success', 'Reward created');
-      loadRewards();
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -413,7 +346,7 @@ function App() {
         <div className="sidebar-header">
           <div>
             <h1>Ikafé Loyalty</h1>
-            <p>Scan, join, and view your customer dashboard.</p>
+            <p>Visit-based cashback and wallet redemption.</p>
           </div>
           <button className="mobile-menu-toggle" onClick={() => setSidebarOpen((open) => !open)}>
             {sidebarOpen ? 'Close' : 'Menu'}
@@ -433,8 +366,8 @@ function App() {
         <div className="card compact">
           <h3>Live stats</h3>
           <p>{customers.length} customers</p>
-          <p>{stats.totalPoints} loyalty points</p>
-          <p>{rewards.length} active rewards</p>
+          <p>{formatRwf(stats.totalWalletBalance)} wallet balance</p>
+          <p>{formatRwf(stats.totalSpent)} total spend</p>
         </div>
       </aside>
 
@@ -458,9 +391,9 @@ function App() {
 
               <div className="hero-card-top">
                 <div className="hero-copy">
-                  <p className="eyebrow">Join the Ikafehaven community</p>
-                  <h2>Earn loyalty rewards, scan your QR, and get gifted.</h2>
-                  <p>Join the large community of Ikafehaven and collect rewards with every visit. Members earn points, redeem rewards, and stay connected with every order.</p>
+                  <p className="eyebrow">Join the Ikafé community</p>
+                  <h2>Earn cashback, climb 5 loyalty levels, and redeem wallet balance on future orders.</h2>
+                  <p>Customers earn cashback in RWF on every bill and automatically move up through the levels as their visits increase.</p>
                   <div className="hero-actions">
                     <button className="cta-primary" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>Create loyalty account</button>
                     <button className="cta-secondary" onClick={openLoginPanel}>Staff / admin login</button>
@@ -495,19 +428,19 @@ function App() {
 
               <div className="hero-cta-grid">
                 <div className="card hero-signup-card">
-                  <p className="panel-title">Top up your membership</p>
-                  <p className="small">Fill this quick form to join Ikafehaven and start earning points right away.</p>
-                  <form onSubmit={handleJoin} className="stack">
+                  <p className="panel-title">Join the loyalty club</p>
+                  <p className="small">Create your account and start building a cashback wallet in RWF.</p>
+                  <form id="join-form" onSubmit={handleJoin} className="stack">
                     <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
                     <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
                     <input placeholder="Email" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
-                    <button type="submit">Join Ikafehaven</button>
+                    <button type="submit">Join Ikaféhaven</button>
                   </form>
                 </div>
 
                 <div className="card hero-lookup-card">
                   <h3>Existing customer?</h3>
-                  <p>Enter your Customer ID to access your loyalty dashboard and track points.</p>
+                  <p>Enter your customer ID to open your loyalty dashboard and review your wallet.</p>
                   <form onSubmit={handleLookup} className="stack">
                     <input placeholder="Your Customer ID" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
                     <button type="submit">Visit customer dashboard</button>
@@ -517,8 +450,8 @@ function App() {
 
               <div className="hero-visual">
                 <div className="hero-panel">
-                  <p className="panel-title">Welcome to Ikafé Loyalty</p>
-                  <p>Scan the code, collect points, and take gifts when you hit your next milestone.</p>
+                  <p className="panel-title">Cashback rules</p>
+                  <p>Level 1: 1% • Level 2: 2% • Level 3: 3% • Level 4: 4% • Level 5: 5%.</p>
                 </div>
               </div>
             </div>
@@ -529,10 +462,7 @@ function App() {
           <section className="view-grid">
             <div className="card">
               <h2>Customer dashboard</h2>
-              <p>Welcome back. Your loyalty dashboard shows points, visits, and available rewards.</p>
-              {customerRewardMessage ? (
-                <div className="banner success">{customerRewardMessage}</div>
-              ) : null}
+              <p>Welcome back. Your dashboard shows your current cashback level, wallet balance, total spending, and visit count.</p>
               <form onSubmit={handleLookup} className="stack inline-form">
                 <input placeholder="Customer ID" value={customerIdInput} onChange={(e) => setCustomerIdInput(e.target.value)} required />
                 <button type="submit">Load my profile</button>
@@ -552,20 +482,25 @@ function App() {
                     </div>
                     <div className="loyalty-metrics">
                       <div>
-                        <span>Points</span>
-                        <strong>{customer.points}</strong>
+                        <span>Level</span>
+                        <strong>{LEVEL_DETAILS[customer.currentLevel]?.label || `Level ${customer.currentLevel || 1}`}</strong>
                       </div>
                       <div>
                         <span>Visits</span>
                         <strong>{customer.visits}</strong>
                       </div>
                       <div>
-                        <span>Spent</span>
-                        <strong>${customer.totalSpent}</strong>
+                        <span>Wallet</span>
+                        <strong>{formatRwf(customer.walletBalance)}</strong>
+                      </div>
+                      <div>
+                        <span>Total spend</span>
+                        <strong>{formatRwf(customer.totalSpent)}</strong>
                       </div>
                     </div>
                   </div>
                   <p className="small">Phone: {customer.phone}</p>
+                  <p className="small">Cashback rate: {LEVEL_DETAILS[customer.currentLevel]?.cashbackRate || 1}%</p>
                   {qrCode ? <img src={qrCode} alt="QR code" className="qr" /> : null}
                 </>
               ) : (
@@ -579,9 +514,11 @@ function App() {
                 <div className="stack">
                   {transactions.map((item) => (
                     <div key={item._id} className="reward-item">
-                      <strong>{item.type === 'redeem' ? 'Reward redeemed' : 'Purchase'}</strong>
+                      <strong>{item.type === 'wallet_redeem' ? 'Wallet redeemed' : 'Purchase'}</strong>
                       <p>{new Date(item.date).toLocaleString()}</p>
-                      <span>{item.pointsEarned >= 0 ? `+${item.pointsEarned}` : item.pointsEarned} pts</span>
+                      <span>
+                        Bill: {formatRwf(item.amount)} • Cashback: {formatRwf(item.cashbackEarned)} • Wallet used: {formatRwf(item.walletUsed)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -591,18 +528,16 @@ function App() {
             </div>
 
             <div className="card">
-              <h3>Available rewards</h3>
-              {rewards.length ? (
-                rewards.map((reward) => (
-                  <div key={reward._id} className="reward-item">
-                    <strong>{reward.name}</strong>
-                    <p>{reward.description}</p>
-                    <span>{reward.pointsRequired} pts</span>
+              <h3>Level guide</h3>
+              <div className="stack">
+                {Object.entries(LEVEL_DETAILS).map(([level, details]) => (
+                  <div key={level} className="reward-item">
+                    <strong>{details.label}</strong>
+                    <p>{details.range}</p>
+                    <span>{details.cashbackRate}% cashback on each bill</span>
                   </div>
-                ))
-              ) : (
-                <p>Rewards will appear here once the admin adds them.</p>
-              )}
+                ))}
+              </div>
             </div>
           </section>
         )}
@@ -611,14 +546,14 @@ function App() {
           <section className="view-grid">
             <div className="card">
               <h2>Staff Dashboard</h2>
-              <p>Enter a customer ID, then add the purchase amount to update points.</p>
+              <p>Use the customer ID to process a bill. The wallet balance is automatically applied before the remaining bill is charged.</p>
               <div className="stats-row">
                 <div className="stat-box">
                   <strong>{customers.length}</strong>
                   <span>Customers</span>
                 </div>
                 <div className="stat-box">
-                  <strong>${stats.totalSpent}</strong>
+                  <strong>{formatRwf(stats.totalSpent)}</strong>
                   <span>Total Spend</span>
                 </div>
                 <div className="stat-box">
@@ -638,20 +573,11 @@ function App() {
             </div>
 
             <div className="card">
-              <h3>Check out purchase</h3>
-              <form onSubmit={handleAddPoints} className="stack">
-                <input placeholder="Customer ID" value={pointsForm.customerId} onChange={(e) => setPointsForm({ ...pointsForm, customerId: e.target.value })} required />
-                <input type="number" placeholder="Bill amount" value={pointsForm.amount} onChange={(e) => setPointsForm({ ...pointsForm, amount: e.target.value })} required />
-                <button type="submit">Calculate points</button>
-              </form>
-            </div>
-
-            <div className="card">
-              <h3>Redeem reward</h3>
-              <form onSubmit={handleRedeem} className="stack">
-                <input placeholder="Customer ID" value={redeemForm.customerId} onChange={(e) => setRedeemForm({ ...redeemForm, customerId: e.target.value })} required />
-                <input type="number" placeholder="Points to spend" value={redeemForm.pointsRequired} onChange={(e) => setRedeemForm({ ...redeemForm, pointsRequired: e.target.value })} required />
-                <button type="submit">Redeem</button>
+              <h3>Process purchase</h3>
+              <form onSubmit={handlePurchase} className="stack">
+                <input placeholder="Customer ID" value={purchaseForm.customerId} onChange={(e) => setPurchaseForm({ ...purchaseForm, customerId: e.target.value })} required />
+                <input type="number" placeholder="Bill amount in RWF" value={purchaseForm.amount} onChange={(e) => setPurchaseForm({ ...purchaseForm, amount: e.target.value })} required />
+                <button type="submit">Process bill</button>
               </form>
             </div>
 
@@ -663,7 +589,8 @@ function App() {
                     <tr>
                       <th>Customer</th>
                       <th>ID</th>
-                      <th>Points</th>
+                      <th>Level</th>
+                      <th>Wallet</th>
                       <th>Spend</th>
                       <th>Visits</th>
                     </tr>
@@ -673,8 +600,9 @@ function App() {
                       <tr key={item._id}>
                         <td>{item.name}</td>
                         <td>{item.customerId}</td>
-                        <td>{item.points}</td>
-                        <td>${item.totalSpent}</td>
+                        <td>{LEVEL_DETAILS[item.currentLevel]?.label || `Level ${item.currentLevel || 1}`}</td>
+                        <td>{formatRwf(item.walletBalance)}</td>
+                        <td>{formatRwf(item.totalSpent)}</td>
                         <td>{item.visits}</td>
                       </tr>
                     ))}
@@ -689,13 +617,7 @@ function App() {
           <section className="view-grid">
             <div className="card">
               <h2>Admin Dashboard</h2>
-              <p>Manage rewards and monitor the strongest loyalty members.</p>
-              <form onSubmit={handleCreateReward} className="stack">
-                <input placeholder="Reward name" value={rewardForm.name} onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })} required />
-                <input placeholder="Description" value={rewardForm.description} onChange={(e) => setRewardForm({ ...rewardForm, description: e.target.value })} required />
-                <input type="number" placeholder="Points required" value={rewardForm.pointsRequired} onChange={(e) => setRewardForm({ ...rewardForm, pointsRequired: e.target.value })} required />
-                <button type="submit">Create reward</button>
-              </form>
+              <p>Monitor the level-based cashback system and wallet balance across the entire customer base.</p>
             </div>
 
             <div className="card">
@@ -741,23 +663,12 @@ function App() {
             </div>
 
             <div className="card">
-              <h3>Top customers</h3>
+              <h3>Top wallet holders</h3>
               {topCustomers.map((customerItem, index) => (
                 <div key={customerItem._id} className="reward-item">
                   <strong>#{index + 1} {customerItem.name}</strong>
                   <p>{customerItem.customerId}</p>
-                  <span>{customerItem.points} pts • ${customerItem.totalSpent}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="card">
-              <h3>Available rewards</h3>
-              {rewards.map((reward) => (
-                <div key={reward._id} className="reward-item">
-                  <strong>{reward.name}</strong>
-                  <p>{reward.description}</p>
-                  <span>{reward.pointsRequired} pts</span>
+                  <span>{LEVEL_DETAILS[customerItem.currentLevel]?.label || `Level ${customerItem.currentLevel || 1}`} • {formatRwf(customerItem.walletBalance)}</span>
                 </div>
               ))}
             </div>
@@ -770,7 +681,8 @@ function App() {
                     <tr>
                       <th>Name</th>
                       <th>Customer ID</th>
-                      <th>Points</th>
+                      <th>Level</th>
+                      <th>Wallet</th>
                       <th>Spend</th>
                       <th>Visits</th>
                     </tr>
@@ -780,8 +692,9 @@ function App() {
                       <tr key={item._id}>
                         <td>{item.name}</td>
                         <td>{item.customerId}</td>
-                        <td>{item.points}</td>
-                        <td>${item.totalSpent}</td>
+                        <td>{LEVEL_DETAILS[item.currentLevel]?.label || `Level ${item.currentLevel || 1}`}</td>
+                        <td>{formatRwf(item.walletBalance)}</td>
+                        <td>{formatRwf(item.totalSpent)}</td>
                         <td>{item.visits}</td>
                       </tr>
                     ))}
