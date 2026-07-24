@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://ikafe-loyality-backend.onrender.com/api';
 
@@ -24,7 +24,7 @@ function App() {
   const [customerIdInput, setCustomerIdInput] = useState('');
   const [staffLookupInput, setStaffLookupInput] = useState('');
 
-  const [joinForm, setJoinForm] = useState({ name: '', phone: '', email: '' });
+  const [joinForm, setJoinForm] = useState({ name: '', phone: '', email: '', dateOfBirth: '' });
   const [purchaseForm, setPurchaseForm] = useState({ customerId: '', amount: '' });
   const [userForm, setUserForm] = useState({ role: 'staff', username: '', password: '', email: '' });
   const [editUserForm, setEditUserForm] = useState({ id: '', role: '', username: '', password: '', email: '' });
@@ -37,7 +37,6 @@ function App() {
   const [authToken, setAuthToken] = useState('');
   const [authUser, setAuthUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const joinFormRef = useRef(null);
 
   const loadCustomers = async () => {
     try {
@@ -141,7 +140,7 @@ function App() {
     setCustomerIdInput('');
     setStaffLookupInput('');
     setPurchaseForm({ customerId: '', amount: '' });
-    setJoinForm({ name: '', phone: '', email: '' });
+    setJoinForm({ name: '', phone: '', email: '', dateOfBirth: '' });
     setAuthToken('');
     setAuthUser(null);
     localStorage.removeItem('ikafeAuth');
@@ -164,6 +163,28 @@ function App() {
     setShowLoginPanel(true);
     setLoginMode(null);
     setMessage({ type: '', text: '' });
+  };
+
+  const handleScrollToJoin = () => {
+    const joinForm = document.getElementById('join-form');
+    if (joinForm) {
+      const formRect = joinForm.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const offset = 100; // Extra padding from top
+      
+      window.scrollTo({
+        top: formRect.top + scrollTop - offset,
+        behavior: 'smooth'
+      });
+      
+      // Focus on the first input after scroll completes
+      setTimeout(() => {
+        const firstInput = joinForm.querySelector('input');
+        if (firstInput) {
+          firstInput.focus();
+        }
+      }, 800);
+    }
   };
 
   const handleStaffLogin = async (event) => {
@@ -237,7 +258,7 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Membership join failed');
       await syncCustomerState(data.customer, data.qrCode || '');
-      setJoinForm({ name: '', phone: '', email: '' });
+      setJoinForm({ name: '', phone: '', email: '', dateOfBirth: '' });
       showMessage('success', `Welcome ${data.customer.name}! Your loyalty card is ready.`);
       loadCustomers();
       setAppMode('customer');
@@ -454,16 +475,7 @@ function App() {
                   <p className="eyebrow">☕ Ikafé Loyalty Program</p>
                 </div>
                 <div className="hero-topbar-right">
-                  <button className="cta-secondary" onClick={() => {
-                    const form = joinFormRef.current || document.getElementById('join-form');
-                    if (form) {
-                      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      setTimeout(() => {
-                        const firstInput = form.querySelector('input');
-                        if (firstInput) firstInput.focus();
-                      }, 800);
-                    }
-                  }}>Get Started</button>
+                  <button className="cta-secondary" onClick={handleScrollToJoin}>Get Started</button>
                   <button className="hero-login-link ghost-button" onClick={openLoginPanel}>Team Access</button>
                 </div>
               </div>
@@ -474,16 +486,7 @@ function App() {
                   <h2>Earn Cashback on Every Visit • Unlock Exclusive Perks • Redeem Your Wallet</h2>
                   <p>Join our loyalty program and earn up to 5% cashback on every purchase. Watch your rewards grow as you climb through 5 exclusive levels, from your first visit to VIP status.</p>
                   <div className="hero-actions">
-                    <button className="cta-primary" onClick={() => {
-                      const form = joinFormRef.current || document.getElementById('join-form');
-                      if (form) {
-                        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        setTimeout(() => {
-                          const firstInput = form.querySelector('input');
-                          if (firstInput) firstInput.focus();
-                        }, 800);
-                      }
-                    }}>Start Earning Today</button>
+                    <button className="cta-primary" onClick={handleScrollToJoin}>Start Earning Today</button>
                     <button className="cta-secondary" onClick={openLoginPanel}>Staff Dashboard</button>
                   </div>
                 </div>
@@ -518,9 +521,10 @@ function App() {
                 <div className="card hero-signup-card">
                   <p className="panel-title">🎁 Join the Loyalty Club</p>
                   <p className="small">Create your account in seconds and start earning cashback on every visit. Your wallet grows with each purchase.</p>
-                  <form id="join-form" ref={joinFormRef} onSubmit={handleJoin} className="stack">
+                  <form id="join-form" onSubmit={handleJoin} className="stack">
                     <input placeholder="Full name" value={joinForm.name} onChange={(e) => setJoinForm({ ...joinForm, name: e.target.value })} required />
                     <input placeholder="Phone number" value={joinForm.phone} onChange={(e) => setJoinForm({ ...joinForm, phone: e.target.value })} required />
+                    <input placeholder="Date of birth (MM/DD - optional)" value={joinForm.dateOfBirth} onChange={(e) => setJoinForm({ ...joinForm, dateOfBirth: e.target.value })} />
                     <input placeholder="Email (optional)" value={joinForm.email} onChange={(e) => setJoinForm({ ...joinForm, email: e.target.value })} />
                     <button type="submit">Create My Account</button>
                   </form>
